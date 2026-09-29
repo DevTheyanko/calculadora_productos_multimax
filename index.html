@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cotizadora PriorityMax</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: { extend: {
+    fontFamily: { sans: ['Inter', 'sans-serif'] },
+    colors: { bn: {
+      yellow: '#F0B90B', hover: '#D9A300', bg: '#F5F5F5', text: '#1E2329',
+      muted: '#707A8A', border: '#EAECEF', green: '#0ECB81', red: '#F6465D'
+    } }
+  } }
+}
+</script>
+<style>
+  body { background:#F5F5F5; color:#1E2329; font-family:'Inter',sans-serif; }
+  .card { background:#fff; border:1px solid #EAECEF; border-radius:12px; }
+  .btn-y { background:#F0B90B; color:#000; font-weight:600; transition:.2s; }
+  .btn-y:hover { background:#D9A300; }
+  .inp { width:100%; background:#F5F5F5; border:1px solid #EAECEF; border-radius:8px; padding:.5rem .75rem; font-size:.875rem; outline:none; }
+  .inp:focus { border-color:#F0B90B; background:#fff; }
+  .no-sb::-webkit-scrollbar { display:none; } .no-sb { scrollbar-width:none; }
+  :focus-visible { outline:2px solid #F0B90B; outline-offset:2px; }
+</style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+<header class="bg-white border-b border-bn-border sticky top-0 z-40">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
+    <div class="w-10 h-10 rounded-lg bg-bn-yellow flex items-center justify-center text-black text-lg"><i class="fa-solid fa-calculator"></i></div>
+    <div>
+      <h1 class="text-base font-bold leading-tight">Cotizadora PriorityMax</h1>
+      <p class="text-xs text-bn-muted">Productos a cuotas</p>
+    </div>
+  </div>
+  <div class="max-w-6xl mx-auto px-4 flex gap-6 overflow-x-auto no-sb">
+    <button id="tab-calc" onclick="switchTab('calc')" class="py-2.5 border-b-2 border-bn-yellow text-sm font-semibold whitespace-nowrap"><i class="fa-solid fa-cart-shopping mr-1.5 text-bn-yellow"></i>Cotizar</button>
+    <button id="tab-conf" onclick="switchTab('conf')" class="py-2.5 border-b-2 border-transparent text-bn-muted text-sm font-medium whitespace-nowrap"><i class="fa-solid fa-sliders mr-1.5"></i>Configuración</button>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-5 flex-1 w-full">
+
+<!-- COTIZAR -->
+<div id="view-calc" class="space-y-5">
+  <div class="card p-4">
+    <label class="block text-xs font-semibold text-bn-muted mb-1">Nivel de crédito</label>
+    <select id="level-select" class="inp font-semibold" onchange="onLevelChange(true)"></select>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+    <!-- Izquierda -->
+    <div class="lg:col-span-7 space-y-5">
+      <div class="card p-4">
+        <h2 class="text-sm font-bold mb-3"><i class="fa-solid fa-circle-plus text-bn-yellow mr-2"></i>Agregar producto</h2>
+        <form onsubmit="addProduct(event)" class="grid grid-cols-6 gap-3">
+          <div class="col-span-6">
+            <label class="block text-xs font-medium text-bn-muted mb-1">Producto</label>
+            <input id="p-name" class="inp" placeholder="Ej: Redmi Note 13 Pro 256GB" required>
+          </div>
+          <div class="col-span-4">
+            <label class="block text-xs font-medium text-bn-muted mb-1">Precio normal ($)</label>
+            <input id="p-price" type="number" step="0.01" min="0.01" inputmode="decimal" class="inp font-semibold" placeholder="200.00" required>
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-bn-muted mb-1">Cantidad</label>
+            <input id="p-qty" type="number" min="1" value="1" class="inp text-center font-semibold" required>
+          </div>
+          <button class="btn-y col-span-6 py-2.5 rounded-lg text-sm"><i class="fa-solid fa-plus mr-1.5"></i>Agregar a la cotización</button>
+        </form>
+      </div>
+
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-bold"><i class="fa-solid fa-list-check text-bn-yellow mr-2"></i>Productos (<span id="cart-count">0</span>)</h2>
+          <button onclick="clearCart()" class="text-xs text-bn-red font-medium hover:underline"><i class="fa-solid fa-trash-can mr-1"></i>Vaciar</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead><tr class="bg-bn-bg text-bn-muted">
+              <th class="p-2 rounded-l-lg">Producto</th><th class="p-2 text-center">Cant.</th>
+              <th class="p-2 text-right">Precio</th><th class="p-2 text-right">Subtotal</th><th class="p-2 rounded-r-lg"></th>
+            </tr></thead>
+            <tbody id="cart-body" class="divide-y divide-bn-border"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Derecha -->
+    <div class="lg:col-span-5 space-y-5">
+      <div class="card p-4 space-y-4">
+        <h2 class="text-sm font-bold"><i class="fa-solid fa-chart-pie text-bn-yellow mr-2"></i>Resumen</h2>
+        <div id="level-line" class="text-xs text-bn-muted bg-bn-bg border border-bn-border rounded-lg px-3 py-2"></div>
+        <div>
+          <label id="inst-label" class="block text-[11px] text-bn-muted mb-1">Cuotas</label>
+          <select id="s-inst" class="inp font-bold" onchange="calc()"></select>
+        </div>
+
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span class="text-bn-muted">Precio real (contado)</span><b id="r-real">$0.00</b></div>
+          <div class="flex justify-between"><span class="text-bn-muted">Recargo</span><b id="r-fee" class="text-bn-muted">$0.00</b></div>
+          <div class="flex justify-between"><span class="text-bn-muted">Saldo financiado</span><b id="r-fin">$0.00</b></div>
+        </div>
+
+        <div class="rounded-lg p-3 flex items-center justify-between bg-amber-50 border border-amber-200">
+          <div><div class="text-xs font-bold text-amber-900">Inicial a pagar</div><div id="r-init-pct" class="text-[11px] text-amber-700"></div></div>
+          <div id="r-init" class="text-2xl font-extrabold text-amber-900">$0.00</div>
+        </div>
+        <div class="rounded-lg p-3 flex items-center justify-between bg-emerald-50 border border-emerald-200">
+          <div><div id="r-q-label" class="text-xs font-bold text-emerald-900">Cada cuota</div><div id="r-q-sub" class="text-[11px] text-emerald-700"></div></div>
+          <div id="r-q" class="text-2xl font-extrabold text-emerald-900">$0.00</div>
+        </div>
+        <div class="flex justify-between text-xs text-bn-muted"><span>Total final (inicial + cuotas)</span><b id="r-total" class="text-bn-text">$0.00</b></div>
+
+        <!-- Verificación -->
+        <div class="border-t border-bn-border pt-4 space-y-3">
+          <h3 class="text-sm font-bold"><i class="fa-solid fa-circle-question text-bn-yellow mr-2"></i>¿Le da o qué le falta?</h3>
+          <div>
+            <label class="block text-[11px] text-bn-muted mb-1">Inicial disponible ($)</label>
+            <input id="c-cash" type="number" min="0" step="0.01" inputmode="decimal" class="inp" placeholder="0.00" oninput="calc(); persistMeta()">
+          </div>
+          <div id="verdict" class="rounded-lg p-3 text-xs"></div>
+        </div>
+
+        <details>
+          <summary class="text-xs font-semibold cursor-pointer select-none"><i class="fa-solid fa-list text-bn-yellow mr-1.5"></i>Detalle por producto</summary>
+          <div id="breakdown" class="mt-3 space-y-2 max-h-64 overflow-y-auto"></div>
+        </details>
+
+        <div class="space-y-2">
+          <div>
+            <label class="block text-[11px] text-bn-muted mb-1"><i class="fa-brands fa-whatsapp text-bn-green mr-1"></i>WhatsApp destino</label>
+            <input id="wa-number" class="inp" placeholder="04268092177" oninput="persistMeta()">
+          </div>
+          <button onclick="sendWhatsApp()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors">
+            <i class="fa-brands fa-whatsapp text-xl"></i>Enviar por WhatsApp
+          </button>
+          <button onclick="copyQuote()" class="w-full bg-bn-bg hover:bg-gray-200 border border-bn-border font-semibold py-2.5 rounded-lg text-xs transition-colors">
+            <i class="fa-solid fa-copy mr-1.5"></i>Copiar cotización
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIGURACIÓN -->
+<div id="view-conf" class="hidden">
+  <div class="card p-5">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-bn-border pb-4 mb-4">
+      <div>
+        <h2 class="text-base font-bold"><i class="fa-solid fa-sliders text-bn-yellow mr-2"></i>Niveles PriorityMax</h2>
+        <p class="text-xs text-bn-muted mt-1">Cada nivel define inicial, recargo, cuotas, frecuencia y cupo máximo a financiar.</p>
+      </div>
+      <button onclick="openModal()" class="btn-y px-4 py-2 rounded-lg text-xs self-start"><i class="fa-solid fa-plus mr-1.5"></i>Nuevo nivel</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs text-left">
+        <thead><tr class="bg-bn-bg text-bn-muted">
+          <th class="p-3 rounded-l-lg">Nivel</th><th class="p-3 text-center">% Inicial</th><th class="p-3 text-center">% Recargo</th>
+          <th class="p-3 text-center">Cuotas (máx.)</th><th class="p-3 text-center">Frecuencia</th><th class="p-3 text-center">Cupo</th><th class="p-3 rounded-r-lg"></th>
+        </tr></thead>
+        <tbody id="levels-body" class="divide-y divide-bn-border"></tbody>
+      </table>
+    </div>
+    <div class="mt-5 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900">
+      <b>Cómo se calcula:</b> inicial = % inicial del precio real. El recargo se aplica sobre el saldo (precio real − inicial) y ese total se divide entre las cuotas. El cupo es el máximo de saldo financiado (con recargo) que permite el nivel.
+    </div>
+    <div class="mt-3 flex justify-end">
+      <button onclick="restoreDefaults()" class="text-xs text-bn-muted hover:text-bn-red hover:underline">Restaurar niveles de ejemplo</button>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- MODAL -->
+<div id="modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl w-full max-w-md p-5 space-y-4">
+    <div class="flex justify-between items-center border-b border-bn-border pb-3">
+      <h3 id="m-title" class="font-bold text-sm">Nuevo nivel</h3>
+      <button onclick="closeModal()" class="text-bn-muted hover:text-bn-text" aria-label="Cerrar"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+    <form onsubmit="saveLevel(event)" class="space-y-3">
+      <input type="hidden" id="m-id">
+      <div>
+        <label class="block text-xs font-semibold text-bn-muted mb-1">Grupo</label>
+        <select id="m-group" class="inp"><option value="Base">Base</option><option value="Premium">Premium</option></select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-bn-muted mb-1">Nombre</label>
+        <input id="m-name" class="inp" required placeholder="Ej: Gold">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-semibold text-bn-muted mb-1">% Inicial</label><input id="m-initial" type="number" step="0.1" min="0" max="100" class="inp" required></div>
+        <div><label class="block text-xs font-semibold text-bn-muted mb-1">% Recargo</label><input id="m-fee" type="number" step="0.1" min="0" max="100" class="inp" required></div>
+        <div><label class="block text-xs font-semibold text-bn-muted mb-1">Cuotas máximas</label><input id="m-inst" type="number" min="1" max="60" class="inp" required></div>
+        <div><label class="block text-xs font-semibold text-bn-muted mb-1">Frecuencia</label>
+          <select id="m-freq" class="inp"><option>Semanal</option><option>Quincenal</option><option>Mensual</option></select></div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-bn-muted mb-1">Cupo máximo a financiar ($, 0 = sin límite)</label>
+        <input id="m-cupo" type="number" min="0" step="0.01" class="inp" required>
+      </div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" onclick="closeModal()" class="px-4 py-2 text-xs font-semibold text-bn-muted rounded-lg hover:bg-gray-100">Cancelar</button>
+        <button class="btn-y px-4 py-2 rounded-lg text-xs">Guardar nivel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast" class="fixed bottom-5 right-5 z-50 translate-y-24 opacity-0 transition-all duration-300 bg-bn-text text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-2 text-sm">
+  <i id="t-icon" class="fa-solid fa-circle-check text-bn-yellow"></i><span id="t-msg"></span>
+</div>
+
+<footer class="text-center text-xs text-bn-muted py-4">Cotizadora PriorityMax</footer>
+
+<script>
+const DEFAULT_LEVELS = [
+  { id:'p-classic-premium', name:'Classic', group:'Premium', initialPct:40, feePct:0, installments:24, frequency:'Quincenal', cupo:500 },
+  { id:'p-bronze-premium', name:'Bronze', group:'Premium', initialPct:40, feePct:0, installments:24, frequency:'Quincenal', cupo:600 },
+  { id:'p-silver-premium', name:'Silver', group:'Premium', initialPct:30, feePct:0, installments:24, frequency:'Quincenal', cupo:800 },
+  { id:'p-gold-premium', name:'Gold', group:'Premium', initialPct:20, feePct:0, installments:24, frequency:'Quincenal', cupo:1000 },
+  { id:'p-vip-premium', name:'VIP', group:'Premium', initialPct:20, feePct:0, installments:24, frequency:'Quincenal', cupo:1200 },
+  { id:'p-platinum-premium', name:'Platinum', group:'Premium', initialPct:20, feePct:0, installments:24, frequency:'Quincenal', cupo:1500 },
+  { id:'p-diamond-premium', name:'Diamond', group:'Premium', initialPct:10, feePct:0, installments:24, frequency:'Quincenal', cupo:2000 },
+  { id:'b-classic', name:'Classic', group:'Base', initialPct:40, feePct:0, installments:6, frequency:'Quincenal', cupo:200 },
+  { id:'b-bronze', name:'Bronze', group:'Base', initialPct:40, feePct:0, installments:6, frequency:'Quincenal', cupo:300 },
+  { id:'b-silver', name:'Silver', group:'Base', initialPct:30, feePct:0, installments:8, frequency:'Quincenal', cupo:400 },
+  { id:'b-gold', name:'Gold', group:'Base', initialPct:20, feePct:0, installments:8, frequency:'Quincenal', cupo:500 },
+  { id:'b-vip', name:'VIP', group:'Base', initialPct:20, feePct:0, installments:10, frequency:'Quincenal', cupo:600 },
+  { id:'b-platinum', name:'Platinum', group:'Base', initialPct:10, feePct:0, installments:10, frequency:'Quincenal', cupo:800 },
+  { id:'b-diamond', name:'Diamond', group:'Base', initialPct:10, feePct:0, installments:12, frequency:'Quincenal', cupo:1000 }
+];
+const GROUPS = ['Base', 'Premium'];
+const PLURAL = { Semanal:'semanales', Quincenal:'quincenales', Mensual:'mensuales' };
+const DEFAULT_WA = '04268092177';
+
+let levels = [], cart = [], current = null, meta = {};
+
+const $ = id => document.getElementById(id);
+const money = n => '$' + (Number.isFinite(n) ? n : 0).toFixed(2);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+const store = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+};
+
+window.onload = () => {
+  levels = store.get('pm_levels_v3', null) || structuredClone(DEFAULT_LEVELS);
+  cart = store.get('pm_cart', []);
+  meta = store.get('pm_meta', { wa:DEFAULT_WA, level:'', cash:'' });
+  $('wa-number').value = meta.wa || DEFAULT_WA;
+  $('c-cash').value = meta.cash || '';
+  renderLevelSelect(meta.level);
+  renderCart(); renderLevelsTable(); calc();
+};
+
+function persistMeta(){
+  meta.wa = $('wa-number').value;
+  meta.cash = $('c-cash').value;
+  store.set('pm_meta', meta);
+}
+
+function switchTab(t){
+  const on = 'py-2.5 border-b-2 border-bn-yellow text-sm font-semibold whitespace-nowrap';
+  const off = 'py-2.5 border-b-2 border-transparent text-bn-muted text-sm font-medium whitespace-nowrap';
+  $('tab-calc').className = t==='calc' ? on : off;
+  $('tab-conf').className = t==='conf' ? on : off;
+  $('view-calc').classList.toggle('hidden', t!=='calc');
+  $('view-conf').classList.toggle('hidden', t!=='conf');
+}
+
+/* ---------- Niveles ---------- */
+function renderLevelSelect(selectedId){
+  const sel = $('level-select');
+  sel.innerHTML = GROUPS.map(g => {
+    const items = levels.filter(l => (l.group || 'Base') === g);
+    if (!items.length) return '';
+    return `<optgroup label="Categorías ${g}">` + items.map(l =>
+      `<option value="${esc(l.id)}">${esc(l.name)} · cupo ${money(l.cupo)} · ${l.initialPct}% inicial · hasta ${l.installments} cuotas</option>`).join('') + '</optgroup>';
+  }).join('');
+  const keep = levels.find(l => l.id === selectedId) ? selectedId : (levels[0] && levels[0].id);
+  if (keep) { sel.value = keep; onLevelChange(false); }
+}
+
+function onLevelChange(persist){
+  current = levels.find(l => l.id === $('level-select').value) || levels[0];
+  if (!current) return;
+  fillInst();
+  if (persist) { meta.level = current.id; store.set('pm_meta', meta); }
+  calc();
+}
+
+function fillInst(){
+  const n = current.installments;
+  let o = '';
+  for (let i = n; i >= 1; i--) o += `<option value="${i}">${i} cuotas ${PLURAL[current.frequency]}</option>`;
+  $('s-inst').innerHTML = o;
+  $('s-inst').value = n;
+  $('inst-label').textContent = `Cuotas (hasta ${n})`;
+}
+
+function renderLevelsTable(){
+  $('levels-body').innerHTML = GROUPS.map(g => {
+    const items = levels.filter(l => (l.group || 'Base') === g);
+    if (!items.length) return '';
+    const head = `<tr class="bg-amber-50"><td colspan="7" class="p-2.5 font-bold text-amber-900">Categorías ${g} <span class="font-normal text-amber-700">(${items.length})</span></td></tr>`;
+    return head + items.map(l => `
+    <tr class="hover:bg-bn-bg/60">
+      <td class="p-3 font-bold">${esc(l.name)}</td>
+      <td class="p-3 text-center"><span class="px-2 py-1 rounded bg-amber-50 text-amber-900 font-semibold">${l.initialPct}%</span></td>
+      <td class="p-3 text-center"><span class="px-2 py-1 rounded bg-gray-100 font-semibold">${l.feePct}%</span></td>
+      <td class="p-3 text-center font-semibold">${l.installments}</td>
+      <td class="p-3 text-center text-bn-muted">${esc(l.frequency)}</td>
+      <td class="p-3 text-center font-semibold">${l.cupo > 0 ? money(l.cupo) : 'Sin límite'}</td>
+      <td class="p-3 text-right whitespace-nowrap">
+        <button onclick="editLevel('${esc(l.id)}')" class="text-bn-hover p-1.5" aria-label="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
+        <button onclick="deleteLevel('${esc(l.id)}')" class="text-bn-red p-1.5" aria-label="Eliminar"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    </tr>`).join('');
+  }).join('');
+}
+
+function openModal(){
+  $('m-title').textContent = 'Nuevo nivel';
+  $('m-id').value = ''; $('m-name').value = ''; $('m-group').value = 'Base';
+  $('m-initial').value = 30; $('m-fee').value = 5; $('m-inst').value = 6;
+  $('m-freq').value = 'Quincenal'; $('m-cupo').value = 0;
+  $('modal').classList.remove('hidden'); $('m-name').focus();
+}
+function editLevel(id){
+  const l = levels.find(x => x.id === id); if (!l) return;
+  $('m-title').textContent = 'Editar nivel';
+  $('m-id').value = l.id; $('m-name').value = l.name; $('m-group').value = l.group || 'Base';
+  $('m-initial').value = l.initialPct; $('m-fee').value = l.feePct;
+  $('m-inst').value = l.installments; $('m-freq').value = l.frequency; $('m-cupo').value = l.cupo || 0;
+  $('modal').classList.remove('hidden');
+}
+function closeModal(){ $('modal').classList.add('hidden'); }
+
+function saveLevel(e){
+  e.preventDefault();
+  const data = {
+    name: $('m-name').value.trim(),
+    group: $('m-group').value,
+    initialPct: parseFloat($('m-initial').value),
+    feePct: parseFloat($('m-fee').value),
+    installments: parseInt($('m-inst').value, 10),
+    frequency: $('m-freq').value,
+    cupo: parseFloat($('m-cupo').value) || 0
+  };
+  if (!data.name || [data.initialPct, data.feePct, data.installments].some(isNaN)) { toast('Completa todos los campos', true); return; }
+  const id = $('m-id').value;
+  let selectId = $('level-select').value;
+  if (id) {
+    Object.assign(levels.find(l => l.id === id), data);
+  } else {
+    const nid = 'lvl-' + Date.now();
+    levels.push({ id:nid, ...data });
+    selectId = nid;
+  }
+  store.set('pm_levels_v3', levels);
+  renderLevelSelect(selectId); renderLevelsTable(); closeModal();
+  meta.level = $('level-select').value; store.set('pm_meta', meta);
+  toast('Nivel guardado');
+}
+
+function deleteLevel(id){
+  if (levels.length <= 1) { toast('Debe quedar al menos un nivel', true); return; }
+  if (!confirm('¿Eliminar este nivel?')) return;
+  levels = levels.filter(l => l.id !== id);
+  store.set('pm_levels_v3', levels);
+  renderLevelSelect($('level-select').value); renderLevelsTable();
+  toast('Nivel eliminado');
+}
+
+function restoreDefaults(){
+  if (!confirm('Se reemplazarán tus niveles por los de ejemplo. ¿Continuar?')) return;
+  levels = structuredClone(DEFAULT_LEVELS);
+  store.set('pm_levels_v3', levels);
+  renderLevelSelect(levels[0].id); renderLevelsTable();
+  toast('Niveles restaurados');
+}
+
+/* ---------- Productos ---------- */
+function addProduct(e){
+  e.preventDefault();
+  const name = $('p-name').value.trim();
+  const price = parseFloat($('p-price').value);
+  const qty = parseInt($('p-qty').value, 10);
+  if (!name || !(price > 0) || !(qty > 0)) { toast('Datos de producto inválidos', true); return; }
+  cart.push({ id: Date.now(), name, price, qty });
+  store.set('pm_cart', cart);
+  $('p-name').value = ''; $('p-price').value = ''; $('p-qty').value = 1; $('p-name').focus();
+  renderCart(); calc(); toast('Producto agregado');
+}
+function removeProduct(id){
+  cart = cart.filter(p => p.id !== id);
+  store.set('pm_cart', cart); renderCart(); calc();
+}
+function setQty(id, v){
+  const q = parseInt(v, 10); if (!(q > 0)) return;
+  const p = cart.find(x => x.id === id); if (!p) return;
+  p.qty = q; store.set('pm_cart', cart); renderCart(); calc();
+}
+function clearCart(){
+  if (!cart.length) return;
+  cart = []; store.set('pm_cart', cart); renderCart(); calc(); toast('Lista vaciada');
+}
+function renderCart(){
+  $('cart-count').textContent = cart.length;
+  if (!cart.length) {
+    $('cart-body').innerHTML = `<tr><td colspan="5" class="py-8 text-center text-bn-muted"><i class="fa-solid fa-basket-shopping text-2xl block mb-2 text-gray-300"></i>Agrega el primer producto para cotizar.</td></tr>`;
+    return;
+  }
+  $('cart-body').innerHTML = cart.map(p => `
+    <tr>
+      <td class="p-2 font-medium">${esc(p.name)}</td>
+      <td class="p-2 text-center"><input type="number" min="1" value="${p.qty}" onchange="setQty(${p.id}, this.value)" class="w-14 bg-bn-bg border border-bn-border rounded text-center py-0.5 font-semibold"></td>
+      <td class="p-2 text-right text-bn-muted">${money(p.price)}</td>
+      <td class="p-2 text-right font-bold">${money(p.price * p.qty)}</td>
+      <td class="p-2 text-center"><button onclick="removeProduct(${p.id})" class="text-bn-red p-1" aria-label="Quitar"><i class="fa-solid fa-xmark"></i></button></td>
+    </tr>`).join('');
+}
+
+/* ---------- Cálculo ---------- */
+function params(){
+  const l = current || { initialPct:0, feePct:0, installments:1, frequency:'Quincenal', cupo:0 };
+  return {
+    initialPct: l.initialPct, feePct: l.feePct, inst: Math.min(l.installments, Math.max(1, parseInt($('s-inst').value, 10) || l.installments)),
+    freq: l.frequency, cupo: l.cupo || 0,
+    cash: Math.max(0, parseFloat($('c-cash').value) || 0)
+  };
+}
+
+function money2(price, p){
+  const initial = price * p.initialPct / 100;
+  const base = price - initial;
+  const fee = base * p.feePct / 100;
+  const financed = base + fee;
+  return { price, initial, fee, financed, quota: financed / p.inst, total: initial + financed };
+}
+
+function calc(){
+  const p = params();
+  const real = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const t = money2(real, p);
+
+  $('level-line').textContent = `${current ? current.group + ' ' + current.name : ''} · ${p.initialPct}% inicial · ${p.feePct}% recargo${p.cupo > 0 ? ' · cupo ' + money(p.cupo) : ''}`;
+  $('r-real').textContent = money(t.price);
+  $('r-fee').textContent = `${money(t.fee)} (${p.feePct}%)`;
+  $('r-fin').textContent = money(t.financed);
+  $('r-init').textContent = money(t.initial);
+  $('r-init-pct').textContent = `${p.initialPct}% del precio real`;
+  $('r-q').textContent = money(t.quota);
+  $('r-q-label').textContent = `Cada cuota ${p.freq.toLowerCase()}`;
+  $('r-q-sub').textContent = `${p.inst} cuotas ${PLURAL[p.freq]}`;
+  $('r-total').textContent = money(t.total);
+
+  renderVerdict(t, p);
+
+  $('breakdown').innerHTML = cart.length ? cart.map(i => {
+    const x = money2(i.price * i.qty, p);
+    return `<div class="bg-bn-bg border border-bn-border rounded-lg p-2.5 text-[11px] space-y-1">
+      <div class="flex justify-between font-bold"><span>${esc(i.name)} (x${i.qty})</span><span>${money(x.price)}</span></div>
+      <div class="flex justify-between text-bn-muted"><span>Inicial ${p.initialPct}%</span><b class="text-amber-800">${money(x.initial)}</b></div>
+      <div class="flex justify-between text-bn-muted"><span>Saldo a cuotas</span><b class="text-bn-text">${money(x.financed)}</b></div>
+      <div class="flex justify-between text-bn-muted"><span>${p.inst} cuotas de</span><b class="text-emerald-800">${money(x.quota)}</b></div>
+    </div>`;
+  }).join('') : '<div class="text-[11px] text-bn-muted">Sin productos.</div>';
+}
+
+/* Devuelve el análisis de aprobación */
+function verdictData(t, p){
+  const issues = [];
+  let minInitial = t.initial;
+  if (p.cupo > 0 && t.financed > p.cupo + 0.005) {
+    // inicial mínima para que el saldo con recargo entre en el cupo
+    const needed = t.price - p.cupo / (1 + p.feePct / 100);
+    minInitial = Math.max(minInitial, needed);
+    issues.push(`El saldo financiado (${money(t.financed)}) excede el cupo del nivel por ${money(t.financed - p.cupo)}. Con este cupo, la inicial mínima sería ${money(needed)}.`);
+  }
+  if (p.cash + 0.005 < minInitial) {
+    issues.push(`Faltan ${money(minInitial - p.cash)} de inicial (necesitas ${money(minInitial)}, hay ${money(p.cash)}).`);
+  }
+  return { ok: issues.length === 0, issues, minInitial };
+}
+
+function renderVerdict(t, p){
+  const el = $('verdict');
+  if (!cart.length) {
+    el.className = 'rounded-lg p-3 text-xs bg-bn-bg text-bn-muted border border-bn-border';
+    el.textContent = 'Agrega productos para ver si le da.'; return;
+  }
+  const v = verdictData(t, p);
+  if (v.ok) {
+    el.className = 'rounded-lg p-3 text-xs bg-emerald-50 text-emerald-900 border border-emerald-200';
+    el.innerHTML = `<b><i class="fa-solid fa-circle-check mr-1"></i>Sí le da.</b> Inicial requerida ${money(t.initial)}${p.cash > 0 ? ` (tiene ${money(p.cash)})` : ''}${p.cupo > 0 ? ` y el saldo entra en el cupo de ${money(p.cupo)}` : ''}.`;
+  } else {
+    el.className = 'rounded-lg p-3 text-xs bg-red-50 text-red-900 border border-red-200 space-y-1';
+    el.innerHTML = `<b><i class="fa-solid fa-circle-xmark mr-1"></i>No le da todavía.</b>` + v.issues.map(i => `<div>• ${esc(i)}</div>`).join('');
+  }
+}
+
+/* ---------- WhatsApp ---------- */
+function buildMessage(){
+  const p = params();
+  const level = current ? `${current.group} ${current.name}` : 'PriorityMax';
+  const real = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const t = money2(real, p);
+  const v = verdictData(t, p);
+  const line = '━━━━━━━━━━━━━━━';
+
+  let m = `📄 *COTIZACIÓN A CUOTAS*\n⭐ *Nivel:* ${level}\n`;
+  m += `⚙️ ${p.initialPct}% inicial · ${p.feePct}% recargo · ${p.inst} cuotas ${PLURAL[p.freq]}\n${line}\n\n`;
+  m += `🛒 *PRODUCTOS (${cart.length})*\n\n`;
+  cart.forEach((i, n) => {
+    const x = money2(i.price * i.qty, p);
+    m += `*${n + 1}. ${i.name}*\n`;
+    m += `   Cantidad: ${i.qty}\n`;
+    m += `   Precio real: ${money(i.price)} c/u → ${money(x.price)}\n`;
+    m += `   Inicial: ${money(x.initial)}\n`;
+    m += `   Saldo financiado: ${money(x.financed)}\n`;
+    m += `   Cuotas: ${p.inst} ${PLURAL[p.freq]} de ${money(x.quota)}\n\n`;
+  });
+  m += `${line}\n📊 *RESUMEN*\n`;
+  m += `💵 Precio real total: ${money(t.price)}\n`;
+  m += `📌 *Inicial total:* ${money(t.initial)}\n`;
+  m += `➕ Recargo: ${money(t.fee)}\n`;
+  m += `💳 Saldo financiado: ${money(t.financed)}\n`;
+  m += `🗓️ *${p.inst} cuotas ${PLURAL[p.freq]} de ${money(t.quota)}*\n`;
+  m += `🧾 Total final: ${money(t.total)}\n${line}\n`;
+  if (v.ok) {
+    m += `✅ *Le da* con este nivel.`;
+  } else {
+    m += `⚠️ *Aún no le da:*\n` + v.issues.map(i => `• ${i}`).join('\n');
+  }
+  return m;
+}
+
+function sendWhatsApp(){
+  if (!cart.length) { toast('Agrega al menos un producto', true); return; }
+  let ph = $('wa-number').value.replace(/\D/g, '') || DEFAULT_WA;
+  if (ph.startsWith('0')) ph = '58' + ph.slice(1);
+  else if (!ph.startsWith('58') && ph.length === 10) ph = '58' + ph;
+  window.open(`https://wa.me/${ph}?text=${encodeURIComponent(buildMessage())}`, '_blank');
+}
+
+function copyQuote(){
+  if (!cart.length) { toast('Agrega al menos un producto', true); return; }
+  const text = buildMessage();
+  const done = () => toast('Cotización copiada');
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(done).catch(fallbackCopy);
+  } else fallbackCopy();
+  function fallbackCopy(){
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch(e){ toast('No se pudo copiar', true); }
+    document.body.removeChild(ta);
+  }
+}
+
+/* ---------- Toast ---------- */
+let tt;
+function toast(msg, err){
+  $('t-msg').textContent = msg;
+  $('t-icon').className = err ? 'fa-solid fa-triangle-exclamation text-bn-red' : 'fa-solid fa-circle-check text-bn-yellow';
+  const el = $('toast');
+  el.classList.remove('translate-y-24', 'opacity-0');
+  clearTimeout(tt);
+  tt = setTimeout(() => el.classList.add('translate-y-24', 'opacity-0'), 2600);
+}
+</script>
+</body>
+</html>
